@@ -1,4 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+import time
+import json
+
 
 def create_market_analyst(llm, toolkit):
 
@@ -7,11 +10,17 @@ def create_market_analyst(llm, toolkit):
         ticker = state["company_of_interest"]
         company_name = state["company_of_interest"]
 
-        # 工具链彻底禁用，Ollama 只支持普通 prompt！
-        # tools = [...]  # 删除
-        # tool_names = ""  # 删除
+        if toolkit.config["online_tools"]:
+            tools = [
+                toolkit.get_YFin_data_online,
+                toolkit.get_stockstats_indicators_report_online,
+            ]
+        else:
+            tools = [
+                toolkit.get_YFin_data,
+                toolkit.get_stockstats_indicators_report,
+            ]
 
-        # 你可以直接在 prompt 里补充数据说明和要求
         system_message = (
             """You are a trading assistant tasked with analyzing financial markets. Your role is to select the **most relevant indicators** for a given market condition or trading strategy from the following list. The goal is to choose up to **8 indicators** that provide complementary insights without redundancy. Categories and each category's indicators are:
 
@@ -37,29 +46,41 @@ Volatility Indicators:
 Volume-Based Indicators:
 - vwma: VWMA: A moving average weighted by volume. Usage: Confirm trends by integrating price action with volume data. Tips: Watch for skewed results from volume spikes; use in combination with other volume analyses.
 
-- Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. Write a very detailed and nuanced report of the trends you observe. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."""
+- Select indicators that provide diverse and complementary information. Avoid redundancy (e.g., do not select both rsi and stochrsi). Also briefly explain why they are suitable for the given market context. When you tool call, please use the exact name of the indicators provided above as they are defined parameters, otherwise your call will fail. Please make sure to call get_YFin_data first to retrieve the CSV that is needed to generate indicators. Write a very detailed and nuanced report of the trends you observe. Do not simply state the trends are mixed, provide detailed and finegrained analysis and insights that may help traders make decisions."""
             + """ Make sure to append a Markdown table at the end of the report to organize key points in the report, organized and easy to read."""
-            f"\nFor your reference, the current date is {current_date}. The company we want to look at is {ticker}."
         )
 
-        # 构建普通消息（无 tools，无 function calling）
-        prompt = [
-            {"role": "system", "content": system_message},
-            # 如果 state["messages"] 有历史消息，可以补上：
-            *state["messages"]
-        ]
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are a helpful AI assistant, collaborating with other assistants."
+                    " Use the provided tools to progress towards answering the question."
+                    " If you are unable to fully answer, that's OK; another assistant with different tools"
+                    " will help where you left off. Execute what you can to make progress."
+                    " If you or any other assistant has the FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** or deliverable,"
+                    " prefix your response with FINAL TRANSACTION PROPOSAL: **BUY/HOLD/SELL** so the team knows to stop."
+                    " You have access to the following tools: {tool_names}.\n{system_message}"
+                    "For your reference, the current date is {current_date}. The company we want to look at is {ticker}",
+                ),
+                MessagesPlaceholder(variable_name="messages"),
+            ]
+        )
 
-        result = llm.invoke(prompt)
+        prompt = prompt.partial(system_message=system_message)
+        prompt = prompt.partial(tool_names=", ".join([tool.name for tool in tools]))
+        prompt = prompt.partial(current_date=current_date)
+        prompt = prompt.partial(ticker=ticker)
+
+        chain = prompt | llm.bind_tools(tools)
+
+        result = chain.invoke(state["messages"])
 
         report = ""
-        # 兼容不同 LLM 的输出
-        if hasattr(result, "content"):
-            report = result.content
-        elif isinstance(result, str):
-            report = result
-        else:
-            report = str(result)
 
+        if len(result.tool_calls) == 0:
+            report = result.content
+       
         return {
             "messages": [result],
             "market_report": report,
