@@ -743,9 +743,6 @@ def run_analysis():
     config["deep_think_llm"] = selections["deep_thinker"]
     config["backend_url"] = selections["backend_url"]
     config["llm_provider"] = selections["llm_provider"].lower()
- 
-
-    
 
     # Initialize the graph
     graph = TradingAgentsGraph(

@@ -150,11 +150,8 @@ def select_shallow_thinking_agent(provider) -> str:
             ("google/gemini-2.0-flash-exp:free - Gemini Flash 2.0 offers a significantly faster time to first token", "google/gemini-2.0-flash-exp:free"),
         ],
         "ollama": [
-            #("llama3.1 local", "llama3.1"),
-            #("llama3.2 local", "llama3.2"),
-            ("qwen3:30b", "qwen3:30b"),
-            ("llama3.1:8b (local)", "llama3.1:8b"),
-            ("deepseek-r1:32b (local)", "deepseek-r1:32b"),
+            ("llama3.1 local", "llama3.1"),
+            ("llama3.2 local", "llama3.2"),
         ]
     }
 
@@ -215,12 +212,8 @@ def select_deep_thinking_agent(provider) -> str:
             ("Deepseek - latest iteration of the flagship chat model family from the DeepSeek team.", "deepseek/deepseek-chat-v3-0324:free"),
         ],
         "ollama": [
-            #("llama3.1 local", "llama3.1"),
-            #("qwen3", "qwen3"),
-            #("deepseek-r1:32b", "DeepSeek‑R1 32B distilled (local)"),
-            ("qwen3:30b", "qwen3:30b"),
-            ("llama3.1:8b (local)", "llama3.1:8b"),
-            ("deepseek-r1:32b (local)", "deepseek-r1:32b"),
+            ("llama3.1 local", "llama3.1"),
+            ("qwen3", "qwen3"),
         ]
     }
     
@@ -254,7 +247,7 @@ def select_llm_provider() -> tuple[str, str]:
         ("Anthropic", "https://api.anthropic.com/"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
-        ("ollama", "http://localhost:11434/v1"),       
+        ("Ollama", "http://localhost:11434/v1"),        
     ]
     
     choice = questionary.select(
