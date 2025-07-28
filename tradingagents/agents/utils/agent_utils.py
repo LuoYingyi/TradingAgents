@@ -30,6 +30,22 @@ def create_msg_delete():
     
     return delete_messages
 
+from langchain_core.messages import BaseMessage, HumanMessage, AIMessage, RemoveMessage
+from typing import List
+
+def create_msg_delete():
+    def delete_messages(state):
+        """Clear messages and add placeholder for compatibility"""
+        messages = state["messages"]
+        removal_operations = [RemoveMessage(id=m.id) for m in messages]
+        placeholder = HumanMessage(content="Continue")
+        return {"messages": removal_operations + [placeholder]}
+    return delete_messages
+
+# 如果项目里其它地方用到 Toolkit，可以留空实现（或干脆删掉这个类）
+class Toolkit:
+    def __init__(self, config=None):
+        pass
 
 class Toolkit:
     _config = DEFAULT_CONFIG.copy()
