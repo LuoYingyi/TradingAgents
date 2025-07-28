@@ -4,67 +4,31 @@ from openai import OpenAI
 
 
 class FinancialSituationMemory:
-    def __init__(self, name, config):
-        if config["backend_url"] == "http://localhost:11434/v1":
-            self.embedding = "nomic-embed-text"
-        else:
-            self.embedding = "text-embedding-3-small"
-        self.client = OpenAI(base_url=config["backend_url"])
-        self.chroma_client = chromadb.Client(Settings(allow_reset=True))
-        self.situation_collection = self.chroma_client.create_collection(name=name)
-
-    def get_embedding(self, text):
-        """Get OpenAI embedding for a text"""
-        
-        response = self.client.embeddings.create(
-            model=self.embedding, input=text
-        )
-        return response.data[0].embedding
+    def __init__(self, name=None, config=None):
+        # 本地模式，只做最简单的文本存储检索
+        self.situations = []
+        self.advice = []
 
     def add_situations(self, situations_and_advice):
-        """Add financial situations and their corresponding advice. Parameter is a list of tuples (situation, rec)"""
-
-        situations = []
-        advice = []
-        ids = []
-        embeddings = []
-
-        offset = self.situation_collection.count()
-
-        for i, (situation, recommendation) in enumerate(situations_and_advice):
-            situations.append(situation)
-            advice.append(recommendation)
-            ids.append(str(offset + i))
-            embeddings.append(self.get_embedding(situation))
-
-        self.situation_collection.add(
-            documents=situations,
-            metadatas=[{"recommendation": rec} for rec in advice],
-            embeddings=embeddings,
-            ids=ids,
-        )
+        for situation, recommendation in situations_and_advice:
+            self.situations.append(situation)
+            self.advice.append(recommendation)
 
     def get_memories(self, current_situation, n_matches=1):
-        """Find matching recommendations using OpenAI embeddings"""
-        query_embedding = self.get_embedding(current_situation)
+        # 简单字符串相似度检索，选最长公共子串最多的N条
+        def simple_similarity(a, b):
+            return sum(1 for w in a.split() if w in b.split())
 
-        results = self.situation_collection.query(
-            query_embeddings=[query_embedding],
-            n_results=n_matches,
-            include=["metadatas", "documents", "distances"],
-        )
-
-        matched_results = []
-        for i in range(len(results["documents"][0])):
-            matched_results.append(
-                {
-                    "matched_situation": results["documents"][0][i],
-                    "recommendation": results["metadatas"][0][i]["recommendation"],
-                    "similarity_score": 1 - results["distances"][0][i],
-                }
-            )
-
-        return matched_results
+        scores = [simple_similarity(current_situation, s) for s in self.situations]
+        ranked = sorted(zip(scores, self.situations, self.advice), reverse=True)
+        results = []
+        for i, (score, s, rec) in enumerate(ranked[:n_matches]):
+            results.append({
+                "matched_situation": s,
+                "recommendation": rec,
+                "similarity_score": score,
+            })
+        return results
 
 
 if __name__ == "__main__":
